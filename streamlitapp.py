@@ -31,26 +31,35 @@ def get_db_password():
             raise FileNotFoundError(
                 "Database password not found in st.secrets or ./password file."
             )
+@st.cache_data
 def load_data():
-    # -----------------------------
-    # Supabase Postgres connection URI
-    # -----------------------------=
-    
-    password = get_db_password()
-    db_url = f"postgresql://postgres.rtewftvldajjhqjbwwfx:{password}@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
+    """
+    Load CPI data, either from local CSV (cpi_long_with_location.csv) if present,
+    or from Supabase PostgreSQL otherwise. Cleans and prepares the DataFrame for dashboard.
+    """
+    csv_path = "cpi_long_with_location.csv"
 
-    # Create SQLAlchemy engine
-    engine = create_engine(db_url)
+    if os.path.exists(csv_path):
+        st.info(f"Loading CPI data from local CSV: {csv_path}")
+        df = pd.read_csv(csv_path)
+    else:
+        st.info("Local CSV not found. Fetching data from Supabase PostgreSQL...")
 
-    # -----------------------------
-    # Fetch table data
-    # -----------------------------
-    st.info("Fetching data from Supabase PostgreSQL...")
+        # Get password
+        password = get_db_password()
+        db_url = f"postgresql://postgres.rtewftvldajjhqjbwwfx:{password}@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
 
-    query = "SELECT * FROM cpi_long_with_location"
-    df = pd.read_sql(query, engine)
-    st.success(f"Fetched {len(df)} rows successfully!")
-    df.to_csv("cpi_data.csv", index=False)  # Save a local copy
+        # SQLAlchemy engine
+        engine = create_engine(db_url)
+
+        # Fetch table
+        query = "SELECT * FROM cpi_long_with_location"
+        df = pd.read_sql(query, engine)
+        st.success(f"Fetched {len(df)} rows successfully!")
+
+        # Save local copy for future use
+        df.to_csv(csv_path, index=False)
+        st.info(f"Saved local CSV for caching: {csv_path}")
 
     # -----------------------------
     # Data cleaning
@@ -58,10 +67,11 @@ def load_data():
     df['REF_DATE'] = pd.to_datetime(df['REF_DATE'], errors='coerce')
     df['GEO'] = df['GEO'].ffill()
     df['UOM'] = df['UOM'].ffill()
+    df['Province'] = df['Province'].fillna(df['GEO'])
+    df['City'] = df['City'].fillna('Unknown')
     df = df[['REF_DATE', 'GEO', 'UOM', 'Products and product groups', 'VALUE', 'MoM', 'YoY', 'City', 'Province']]
     df['VALUE'] = pd.to_numeric(df['VALUE'], errors='coerce')
     df[['VALUE', 'MoM', 'YoY']] = df[['VALUE', 'MoM', 'YoY']].fillna(method='ffill').fillna(method='bfill')
-    df['Province'] = df['Province'].fillna(df['GEO'])
 
     return df
 
