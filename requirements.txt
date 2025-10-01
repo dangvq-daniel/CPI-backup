@@ -1,5 +1,5 @@
-﻿folium==0.20.0
-numpy==1.23.5
+numpy>=1.25
+folium>=0.20.1
 pandas==2.0.2
 plotly==6.3.0
 psycopg2-binary==2.9.10
@@ -11,3 +11,4 @@ streamlit-folium==0.25.2
 streamlit-plotly-events==0.0.6
 supabase
 sqlalchemy
+
